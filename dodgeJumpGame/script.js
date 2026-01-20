@@ -26,9 +26,9 @@ class Game {
           this.gameSpeed = 1;
      }
 
-     update() {
+     update(deltaTime) {
           this.enemies.forEach(enemy => {
-               enemy.update();
+               enemy.update(deltaTime);
           });
 
           this.enemies = this.enemies.filter(enemy => !enemy.shouldRemove);
@@ -39,6 +39,7 @@ class Game {
           this.enemies.forEach(enemy => {
                enemy.draw(this.ctx);
           });
+          this.showScore();
      }
 
      addEnemy(Enemy){
@@ -90,30 +91,20 @@ class Enemy {
 
           this.shouldRemove = false;
           this.game = game;
+
+          this.width = this.spriteWidth;
+          this.height = this.spriteHeight;
      }
 
-     update() {
-          this.x = this.x - this.speed;
+     update(deltaTime) {
+          this.x = this.x - this.vx * deltaTime * 0.1;
+
+          this.y = this.y + this.vy * deltaTime * 0.1;
 
           if (this.x + this.spriteWidth < 0) this.shouldRemove = true;
-          
-          // Calculate vertical movement
-          let newY = this.y + Math.sin(this.angle) * 3;
-          
-          // Apply boundaries
-          if (newY < this.minY) {
-               newY = this.minY;
-               this.angle = -this.angle;  // Bounce
-          } else if (newY > this.maxY) {
-               newY = this.maxY;
-               this.angle = -this.angle;  // Bounce
-          }
-          
-          this.y = newY;
 
-          this.angle += 0.05;
           if (this.game.gameFrame % this.frameSpeed === 0) {
-               this.spriteFrame >= this.maxFrame ? this.spriteFrame = 0 : this.spriteFrame++;
+               this.spriteFrame >= this.maxFrame - 1 ? this.spriteFrame = 0 : this.spriteFrame++;
           }
 
           if (this.x + this.spriteWidth < 0) this.game.gameOver = true;
@@ -124,10 +115,10 @@ class Enemy {
 
           // collisionCtx.strokeStyle = "red";      // border color
           // collisionCtx.lineWidth = 3;            // border thickness
-          collisionCtx.fillRect(this.x, this.y, this.spriteWidth, this.spriteHeight);
+          collisionCtx.fillRect(this.x, this.y, this.width, this.height);
           
           ctx.drawImage(this.image, this.spriteFrame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, 
-               this.x, this.y, this.spriteWidth, this.spriteHeight);
+               this.x, this.y, this.width, this.height);
      }
 }
 
@@ -138,28 +129,103 @@ class Warrior extends Enemy {
           this.spriteWidth = 192;
           this.spriteHeight = 192;
           this.x = game.width + Math.random() * 5;
+          this.vx = this.game.gameSpeed * Math.random();
           this.y = game.height - this.spriteHeight - 20;
+          this.vy = 0;
 
           this.speedModifier = Math.random() * 3 ;
-          this.speed = Math.floor(this.game.gameSpeed * this.speedModifier);
+
           this.frameSpeed = Math.floor(Math.random() * 10 + 5);
           this.maxFrame = 6;
           // this.color = [ Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)];
           this.game = game;
+          this.scale = 0.8;
+          this.width = this.spriteWidth * this.scale;
+          this.height = this.spriteHeight * this.scale;
      }
 
-     update() {
-          this.x = this.x - this.speed;
-
-          if (this.x + this.spriteWidth < 0) this.shouldRemove = true;
-
-          if (this.game.gameFrame % this.frameSpeed === 0) {
-               this.spriteFrame >= this.maxFrame - 1 ? this.spriteFrame = 0 : this.spriteFrame++;
-          }
-
-          if (this.x + this.spriteWidth < 0) this.game.gameOver = true;
+     update(deltaTime) {
+          super.update(deltaTime);
      }
 }
+
+class Toad extends Enemy {
+    constructor(game) {
+        super(game);
+        this.image = toad; // frog spritesheet
+        this.spriteWidth = 80;
+        this.spriteHeight = 64;
+
+        this.x = game.width + Math.random() * 50;
+        this.vx = this.game.gameSpeed * Math.random() * 2  * 0.1;
+        this.groundY = CANVAS_HEIGHT - this.spriteHeight - 100;
+        this.y = this.groundY;
+
+        // physics
+        this.vy = 0;
+        this.gravity = 0.6;
+        this.jumpStrength = -12;
+
+        // animation
+        this.spriteFrame = 2;
+        this.frameTimer = 0;
+        this.frameInterval = 10;
+
+        this.state = "WAIT";
+        this.waitTimer = 0;
+        this.waitDuration = 60; // frames
+          this.width = this.spriteWidth;
+          this.height = this.spriteHeight;
+    }
+
+    update(deltaTime) {
+          switch (this.state) {
+            case "WAIT":
+                this.spriteFrame = this.frameTimer % 40 < 20 ? 2 : 3;
+                this.waitTimer++;
+
+                if (this.waitTimer > this.waitDuration) {
+                    this.jump();
+                }
+                break;
+
+            case "JUMP":
+                this.spriteFrame = 1;
+                this.vy += this.gravity;
+                this.y += this.vy * deltaTime * 0.1;
+                this.x -= this.vx * deltaTime;
+
+                if (this.vy > 0) this.state = "FALL";
+                break;
+
+            case "FALL":
+                this.spriteFrame = 0;
+                this.vy += this.gravity;
+                this.y += this.vy * deltaTime * 0.1;
+                this.x -= this.vx * deltaTime;
+
+                if (this.y >= this.groundY) {
+                    this.land();
+                }
+                break;
+          }
+
+          this.frameTimer++;
+    }
+
+    jump() {
+        this.state = "JUMP";
+        this.vy = this.jumpStrength;
+        this.waitTimer = 0;
+    }
+
+    land() {
+        this.y = this.groundY;
+        this.vy = 0;
+        this.state = "WAIT";
+    }
+}
+
 
 class Skull extends Enemy {
      constructor(game) {
@@ -168,23 +234,24 @@ class Skull extends Enemy {
           this.spriteWidth = 96;
           this.spriteHeight = 112;
           this.x = game.width + Math.random() * 5;
-          this.minY = 100;  // Top boundary
-          this.maxY = CANVAS_HEIGHT - this.spriteHeight - 100;  // Bottom boundary
+          this.vx = this.game.gameSpeed * Math.random() * 0.1;
+          this.minY = 50;  // Top boundary
+          this.maxY = game.height - this.spriteHeight - 200;
           
           // Start within boundaries
           this.y = this.minY + Math.random() * (this.maxY - this.minY);
-          
-          this.speedModifier = Math.random() * 3 ;
-          this.speed = Math.floor(this.game.gameSpeed * this.speedModifier);
+
           this.angle = Math.random() * 10;
           this.frameSpeed = Math.floor(Math.random() * 10 + 5);
           this.maxFrame = 6;
           // this.color = [ Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)];
           this.game = game;
+          this.width = this.spriteWidth;
+          this.height = this.spriteHeight;
      }
 
-     update() {
-          this.x = this.x - this.speed;
+     update(deltaTime) {
+          this.x = this.x - this.vx * deltaTime;
 
           if (this.x + this.spriteWidth < 0) this.shouldRemove = true;
 
@@ -227,7 +294,7 @@ class Explosion {
           this.sound =  new Audio("Fire impact 1.wav");
      }
 
-     update() {
+     update(deltaTime) {
           if (this.frame == 0) this.sound.play();
           this.frame++;
           if (this.frame % 5 == 0) this.spriteFrame++;
@@ -277,6 +344,7 @@ function animate(timeStamp) {
      if (intervalTime > enemyInterval) {
           game.addEnemy(Skull);
           game.addEnemy(Warrior);
+          game.addEnemy(Toad);
           intervalTime = 0;
      }
      lastTime = timeStamp;
@@ -284,9 +352,9 @@ function animate(timeStamp) {
      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
      collisionCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
      
-     game.update();
-     game.draw();
-     game.showScore();
+     game.update(deltaTime);
+     game.draw(ctx);
+
 
      if (!game.gameOver) requestAnimationFrame(animate);
      else game.showGameOver();
