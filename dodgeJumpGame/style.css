@@ -1,0 +1,39 @@
+
+#canvas {
+     width: 1000px;
+     height: 600px;
+     border: 2px solid black;
+     top: 50%; 
+     left: 50%;
+     transform: translate(-50%, -50%);
+     position: absolute;
+}
+
+#collisionCanvas {
+     width: 1000px;
+     height: 600px;
+     /* background-color: red; */
+     top: 50%; 
+     left: 50%;
+     transform: translate(-50%, -50%);
+     position: absolute;
+     display: none;
+}
+
+
+.controls {
+     position: absolute;
+     z-index: 1;
+     transform: translate(-50%);
+     top: 50px;
+     left: 50%;
+}
+
+.controls select option {
+
+     font-size: 25px;
+}
+
+img {
+     display: none;
+}
