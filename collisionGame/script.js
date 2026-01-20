@@ -15,6 +15,10 @@ enemyImage.src = "fire-skull.png";
 let gameFrame = 0;
 const gameSpeed = 1;
 
+let score = 0;
+
+let gameOver = false;
+
 
 class Enemy {
      constructor() {
@@ -36,8 +40,7 @@ class Enemy {
           this.speed = Math.floor(gameSpeed * this.speedModifier);
           this.angle = Math.random() * 10;
           this.frameSpeed = Math.floor(Math.random() * 10 + 10);
-
-          this.color = "rgb(" + Math.floor(Math.random() * 255) + "," + Math.floor(Math.random() * 255) + "," + Math.floor(Math.random() * 255) + ")";
+          this.color = [ Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)];
 
           this.shouldRemove = false;
      }
@@ -65,19 +68,71 @@ class Enemy {
           if (gameFrame % this.frameSpeed === 0) {
                this.spriteFrame > 6 ? this.spriteFrame = 0 : this.spriteFrame++;
           }
+
+          if (this.x + this.spriteWidth < 0) gameOver = true;
      }
 
      draw() {
-          collisionCtx.fillStyle = this.color;
+          collisionCtx.fillStyle = "rgb(" + this.color[0] + "," + this.color[1] + "," + this.color[2] + ")";
 
-          collisionCtx.strokeStyle = "red";      // border color
-          collisionCtx.lineWidth = 3;            // border thickness
+          // collisionCtx.strokeStyle = "red";      // border color
+          // collisionCtx.lineWidth = 3;            // border thickness
           collisionCtx.fillRect(this.x, this.y, this.spriteWidth, this.spriteHeight);
           
           ctx.drawImage(this.image, this.spriteFrame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, 
                this.x, this.y, this.spriteWidth, this.spriteHeight);
      }
 }
+
+const explsionImage = new Image();
+explsionImage.src = "explosion.png";
+
+class Explosion {
+     constructor(x, y) {
+          this.spriteWidth = 48;
+          this.spriteHeight = 48;
+          this.x = x - this.spriteWidth;
+          this.y = y - this.spriteHeight;
+          this.spriteFrame = 0;
+          this.image = explsionImage;
+          this.frame = 0;
+          this.totalSpriteFrame = 5;
+          this.sound =  new Audio("Fire impact 1.wav");
+     }
+
+     update() {
+          if (this.frame == 0) this.sound.play();
+          this.frame++;
+          if (this.frame % 5 == 0) this.spriteFrame++;
+     }
+
+     draw() {
+          ctx.drawImage(this.image, this.spriteFrame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, 
+               this.x, this.y, this.spriteWidth * 2, this.spriteHeight * 2);
+     }
+
+     shouldRemove() {
+          return this.spriteFrame > this.totalSpriteFrame;
+     }
+}
+
+let explosions = [];
+let canvasPosition = canvas.getBoundingClientRect();
+window.addEventListener("click", function(e) {
+     canvasPosition = canvas.getBoundingClientRect();
+     const detectPixelColor = collisionCtx.getImageData(e.x - canvasPosition.left, e.y - canvasPosition.top, 1, 1);
+     console.log(detectPixelColor);
+     const pc = detectPixelColor.data;
+
+     enemies.forEach((enemy) => {
+          // If hit enemy
+          if (enemy.color[0] === pc[0] && enemy.color[1] === pc[1] && enemy.color[2] === pc[2]){
+               enemy.shouldRemove = true;
+               explosions.push(new Explosion(e.x - canvasPosition.left, e.y - canvasPosition.top));
+               score++;
+          }
+     })
+})
 
 
 let enemyNumControl = document.getElementById("enemyNum");
@@ -105,6 +160,23 @@ let deltaTime;
 let intervalTime = 0;
 const enemyInterval = 1000;
 
+function showGameOver(){
+     ctx.fillStyle = "black";
+     ctx.textAlign = "center";
+     ctx.font = "50px Impact";
+     ctx.fillText("Game Over, your score is: " + score, CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+     ctx.fillStyle = "white";
+     ctx.fillText("Game Over, your score is: " + score, CANVAS_WIDTH/2 + 5, CANVAS_HEIGHT/2 + 5);
+}
+
+function showScore(){
+     ctx.fillStyle = "black";
+     ctx.font = "50px Impact";
+     ctx.fillText("Score: " + score, 50, 75);
+     ctx.fillStyle = "white";
+     ctx.fillText("Score: " + score, 55, 80);
+}
+
 function animate(timeStamp) {
      deltaTime = timeStamp - lastTime;
      intervalTime += deltaTime;
@@ -118,15 +190,21 @@ function animate(timeStamp) {
      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
      collisionCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-     enemies = enemies.filter(enemy => !enemy.shouldRemove);
-     enemies.forEach(enemy => {
-          enemy.update();
-          enemy.draw();
-     });
      
+     [...enemies, ...explosions].forEach(object => {
+          object.update();
+          object.draw();
+     });
+
+     // Remove finished explosions
+     enemies = enemies.filter(enemy => !enemy.shouldRemove);
+     explosions = explosions.filter(explosion => !explosion.shouldRemove());
+     
+     showScore();
      gameFrame++;
 
-     requestAnimationFrame(animate);
+     if (!gameOver) requestAnimationFrame(animate);
+     else showGameOver();
 }
 
 animate(0);
